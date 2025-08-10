@@ -1,18 +1,8 @@
-use clap::Parser;
-use vault_rs::args::Args;
+use vault_rs::args::execute_command;
 
 fn main() {
-    let args = Args::parse();
-
-    println!("{:?}", args.cmd);
+    if let Err(e) = execute_command() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }
-
-/*
-use vault_rs::models::Entry;
-
-fn main() {
-    let entry: Entry = Entry::new("example.com", "user", "encrypted");
-    println!("{:?}", entry);
-    println!("Hello, world!");
-}
-*/

@@ -9,11 +9,11 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(site: &str, username: &str, password: &str) -> Self {
+    pub fn new(site: String, username: String, password: String) -> Self {
         Entry {
-            site: site.to_string(),
-            username: username.to_string(),
-            password: password.to_string(),
+            site: site,
+            username: username,
+            password: password,
             created_at: Utc::now(),
         }
     }

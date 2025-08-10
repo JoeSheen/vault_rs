@@ -1,13 +1,42 @@
 use clap::{Parser, Subcommand};
 
+use crate::models::Entry;
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    Init,
-    Add,
-    Get { site: String },
+    // initialises the vault
+    Init {
+        #[arg(short = 'm', long = "master-password")]
+        master_password: String,
+    },
+    // Adds new password entry
+    Add {
+        #[arg(short = 's', long = "site")]
+        site: String,
+        #[arg(short = 'u', long = "username")]
+        username: String,
+        #[arg(short = 'p', long = "password")]
+        password: String,
+    },
+    // Retrieves a password for a site from the vault
+    Get {
+        #[arg(short = 's', long = "site")]
+        site: String,
+    },
+    // Lists all stored site entries
     List,
-    Delete { site: String },
-    ChangePassword,
+    // Deletes a site entry
+    Delete {
+        #[arg(short = 's', long = "site")]
+        site: String,
+    },
+    // Changes the master password
+    ChangePassword {
+        #[arg(short = 'o', long = "old-password")]
+        old_password: String,
+        #[arg(short = 'n', long = "new-password")]
+        new_password: String,
+    },
 }
 
 #[derive(Parser)]
@@ -16,4 +45,29 @@ pub enum Commands {
 pub struct Args {
     #[command(subcommand)]
     pub cmd: Commands,
+}
+
+pub fn execute_command() -> Result<(), String> {
+    let args: Args = Args::parse();
+
+    match args.cmd {
+        Commands::Init { master_password } => {}
+        Commands::Add {
+            site,
+            username,
+            password,
+        } => {
+            let entry: Entry = Entry::new(site, username, password);
+            println!("{:?}", entry);
+        }
+        Commands::Get { site } => {}
+        Commands::List => {}
+        Commands::Delete { site } => {}
+        Commands::ChangePassword {
+            old_password,
+            new_password,
+        } => {}
+    }
+
+    Ok(())
 }
