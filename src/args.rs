@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 
 use crate::{models::Entry, vault};
 
+const PROMPT: &str = "Master Password: ";
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     // initialises the vault
@@ -60,8 +62,9 @@ pub fn execute_command() -> Result<(), String> {
             username,
             password,
         } => {
-            let entry: Entry = Entry::new(site, username, password);
-            println!("{:?}", entry);
+            let master: String = rpassword::prompt_password(PROMPT).unwrap();
+            vault::add_entry(&master, Entry::new(site, username, password))?;
+            println!("Entry added to vault");
         }
         Commands::Get { site } => {}
         Commands::List => {}
