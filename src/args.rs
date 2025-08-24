@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::models::Entry;
+use crate::{models::Entry, vault};
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
@@ -51,7 +51,10 @@ pub fn execute_command() -> Result<(), String> {
     let args: Args = Args::parse();
 
     match args.cmd {
-        Commands::Init { master_password } => {}
+        Commands::Init { master_password } => {
+            vault::init_vault(&master_password)?;
+            println!("Vault initialised");
+        }
         Commands::Add {
             site,
             username,
