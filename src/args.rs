@@ -66,7 +66,17 @@ pub fn execute_command() -> Result<(), String> {
             vault::add_entry(&master, Entry::new(site, username, password))?;
             println!("Entry added to vault");
         }
-        Commands::Get { site } => {}
+        Commands::Get { site } => {
+            let master: String = rpassword::prompt_password(PROMPT).unwrap();
+            if let Some(entry) = vault::get_entry(&master, &site)? {
+                println!(
+                    "site: {}, username: {}, password: {}",
+                    entry.site, entry.username, entry.password
+                );
+            } else {
+                println!("No entry found for site: {}", site);
+            }
+        }
         Commands::List => {}
         Commands::Delete { site } => {}
         Commands::ChangePassword {

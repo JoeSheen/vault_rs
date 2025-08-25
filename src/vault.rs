@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::models::Entry;
 
@@ -48,7 +48,62 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
 }
 
 pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
+    // TODO: verify master password at the start of fn.
+    println!("{}", master_password);
+
+    let path: PathBuf = build_db_path();
+    if !path.exists() {
+        return Err(format!(
+            "Database file does not exist at path: {}",
+            path.to_string_lossy()
+        ));
+    }
+
+    let conn: Connection =
+        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+
+    // TODO: Encrypt passwords in the DB
+    conn.execute(
+        "INSERT INTO entries (site, username, password, created_at) VALUES (?1, ?2, ?3, ?4)",
+        params![entry.site, entry.username, entry.password, entry.created_at],
+    )
+    .map_err(|e| format!("Failed to insert entry: {}", e))?;
+
     Ok(())
+}
+
+pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, String> {
+    // TODO: verify master password at start if fn
+    println!("{}", master_password);
+
+    let path: PathBuf = build_db_path();
+    if !path.exists() {
+        return Err(format!(
+            "Database file does not exist at path: {}",
+            path.to_string_lossy()
+        ));
+    }
+
+    let conn: Connection =
+        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+
+    let result = conn
+        .query_row(
+            "SELECT site, username, password, created_at FROM entries WHERE site = ?1",
+            [site],
+            |row| {
+                Ok(Entry {
+                    site: row.get(0)?,
+                    username: row.get(1)?,
+                    password: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    Ok(result)
 }
 
 fn build_db_path() -> PathBuf {
