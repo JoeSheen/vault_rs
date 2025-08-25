@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, Statement, params};
 
 use crate::models::Entry;
 
@@ -104,6 +104,65 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, Str
         .map_err(|e| e.to_string())?;
 
     Ok(result)
+}
+
+pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
+    // TODO: verify master password at start if fn
+    println!("{}", master_password);
+
+    let path: PathBuf = build_db_path();
+    if !path.exists() {
+        return Err(format!(
+            "Database file does not exist at path: {}",
+            path.to_string_lossy()
+        ));
+    }
+
+    let conn: Connection =
+        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+
+    let mut stmt: Statement<'_> = conn
+        .prepare("SELECT site, username, password, created_at FROM entries")
+        .map_err(|e| e.to_string())?;
+
+    let entries = stmt
+        .query_map([], |row| {
+            Ok(Entry {
+                site: row.get(0)?,
+                username: row.get(1)?,
+                password: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut results: Vec<Entry> = Vec::new();
+    for entry in entries {
+        results.push(entry.map_err(|e| e.to_string())?);
+    }
+
+    Ok(results)
+}
+
+pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
+    // TODO: same as above
+    println!("{}", master_password);
+
+    let path: PathBuf = build_db_path();
+    if !path.exists() {
+        return Err(format!(
+            "Database file does not exist at path: {}",
+            path.to_string_lossy()
+        ));
+    }
+
+    let conn: Connection =
+        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+
+    conn.execute("DELETE FROM entries WHERE site = ?1", [site])
+        .map_err(|e| format!("Failed to delete entry: {}", e))?;
+
+    Ok(())
 }
 
 fn build_db_path() -> PathBuf {

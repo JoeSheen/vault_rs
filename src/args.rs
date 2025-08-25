@@ -77,8 +77,25 @@ pub fn execute_command() -> Result<(), String> {
                 println!("No entry found for site: {}", site);
             }
         }
-        Commands::List => {}
-        Commands::Delete { site } => {}
+        Commands::List => {
+            let master: String = rpassword::prompt_password(PROMPT).unwrap();
+            let entries: Vec<Entry> = vault::list_entries(&master)?;
+            if entries.is_empty() {
+                println!("No entries found")
+            } else {
+                for entry in entries {
+                    println!(
+                        "site: {}, username: {}, password: {}",
+                        entry.site, entry.username, entry.password
+                    );
+                }
+            }
+        }
+        Commands::Delete { site } => {
+            let master: String = rpassword::prompt_password(PROMPT).unwrap();
+            vault::delete_entry(&master, &site)?;
+            println!("Entry deleted: {}", site);
+        }
         Commands::ChangePassword {
             old_password,
             new_password,
