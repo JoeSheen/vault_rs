@@ -165,6 +165,23 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn change_master_password(old_password: &str, new_password: &str) -> Result<(), String> {
+    // TODO: same as above
+    println!("{}", old_password);
+
+    let path: PathBuf = build_db_path();
+    if !path.exists() {
+        return Err(format!(
+            "Database file does not exist at path: {}",
+            path.to_string_lossy()
+        ));
+    }
+
+    let conn: Connection =
+        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+    Ok(())
+}
+
 fn build_db_path() -> PathBuf {
     let mut path: PathBuf = dirs::home_dir().unwrap();
     path.push("Desktop"); // TODO: Remove this line

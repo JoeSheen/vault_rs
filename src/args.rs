@@ -34,8 +34,6 @@ pub enum Commands {
     },
     // Changes the master password
     ChangePassword {
-        #[arg(short = 'o', long = "old-password")]
-        old_password: String,
         #[arg(short = 'n', long = "new-password")]
         new_password: String,
     },
@@ -96,10 +94,11 @@ pub fn execute_command() -> Result<(), String> {
             vault::delete_entry(&master, &site)?;
             println!("Entry deleted: {}", site);
         }
-        Commands::ChangePassword {
-            old_password,
-            new_password,
-        } => {}
+        Commands::ChangePassword { new_password } => {
+            let old_password: String = rpassword::prompt_password(PROMPT).unwrap();
+            vault::change_master_password(&old_password, &new_password)?;
+            println!("Master password changed")
+        }
     }
 
     Ok(())
