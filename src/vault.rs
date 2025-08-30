@@ -179,6 +179,18 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
 
     let conn: Connection =
         Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+
+    conn.execute("DELETE FROM entries", [])
+        .map_err(|e| format!("Failed to delete entries: {}", e))?;
+
+    // TODO: hash the new master passowrd
+
+    conn.execute(
+        "UPDATE vault_metadata SET master_password_hash = ?1 WHERE id = 1",
+        [new_password],
+    )
+    .map_err(|e| format!(": {}", e))?;
+
     Ok(())
 }
 
