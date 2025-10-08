@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use comfy_table::{Cell, Table};
 
 use crate::{models::Entry, vault};
 
@@ -81,12 +82,18 @@ pub fn execute_command() -> Result<(), String> {
             if entries.is_empty() {
                 println!("No entries found")
             } else {
-                for entry in entries {
-                    println!(
-                        "site: {}, username: {}, password: {}",
-                        entry.site, entry.username, entry.password
-                    );
+                let mut table: Table = Table::new();
+                table.set_header(vec!["Index", "Site", "Username", "Password", "Created At"]);
+                for (index, entry) in entries.iter().enumerate() {
+                    table.add_row(vec![
+                        Cell::new(index + 1),
+                        Cell::new(&entry.site),
+                        Cell::new(&entry.username),
+                        Cell::new(&entry.password),
+                        Cell::new(entry.created_at.format("%d-%m-%Y %H:%M:%S").to_string()),
+                    ]);
                 }
+                println!("{}", table);
             }
         }
         Commands::Delete { site } => {
