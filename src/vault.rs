@@ -2,19 +2,15 @@ use std::path::PathBuf;
 
 use rusqlite::{Connection, OptionalExtension, Statement, params};
 
-use crate::models::Entry;
-
-const DB_FILE: &str = "vault_rs.db";
+use crate::{db, models::Entry};
 
 pub fn init_vault(master_password: &str) -> Result<(), String> {
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if path.exists() {
         return Err("Vault already exists".to_string());
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
-
+    let conn: Connection = db::open_db_connection(path)?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS vault_metadata (
             id INTEGER PRIMARY KEY,
@@ -51,7 +47,7 @@ pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
     // TODO: verify master password at the start of fn.
     println!("{}", master_password);
 
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
             "Database file does not exist at path: {}",
@@ -59,8 +55,7 @@ pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
         ));
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+    let conn: Connection = db::open_db_connection(path)?;
 
     // TODO: Encrypt passwords in the DB
     conn.execute(
@@ -76,7 +71,7 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, Str
     // TODO: verify master password at start if fn
     println!("{}", master_password);
 
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
             "Database file does not exist at path: {}",
@@ -84,8 +79,7 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, Str
         ));
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+    let conn: Connection = db::open_db_connection(path)?;
 
     let result = conn
         .query_row(
@@ -110,7 +104,7 @@ pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
     // TODO: verify master password at start if fn
     println!("{}", master_password);
 
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
             "Database file does not exist at path: {}",
@@ -118,8 +112,7 @@ pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
         ));
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+    let conn: Connection = db::open_db_connection(path)?;
 
     let mut stmt: Statement<'_> = conn
         .prepare("SELECT site, username, password, created_at FROM entries")
@@ -148,7 +141,7 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
     // TODO: same as above
     println!("{}", master_password);
 
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
             "Database file does not exist at path: {}",
@@ -156,9 +149,7 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
         ));
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
-
+    let conn: Connection = db::open_db_connection(path)?;
     conn.execute("DELETE FROM entries WHERE site = ?1", [site])
         .map_err(|e| format!("Failed to delete entry: {}", e))?;
 
@@ -169,7 +160,7 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
     // TODO: same as above
     println!("{}", old_password);
 
-    let path: PathBuf = build_db_path();
+    let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
             "Database file does not exist at path: {}",
@@ -177,8 +168,7 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
         ));
     }
 
-    let conn: Connection =
-        Connection::open(path).map_err(|e| format!("Database connection failed: {}", e))?;
+    let conn: Connection = db::open_db_connection(path)?;
 
     conn.execute("DELETE FROM entries", [])
         .map_err(|e| format!("Failed to delete entries: {}", e))?;
@@ -192,11 +182,4 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
     .map_err(|e| format!(": {}", e))?;
 
     Ok(())
-}
-
-fn build_db_path() -> PathBuf {
-    let mut path: PathBuf = dirs::home_dir().unwrap();
-    path.push("Desktop"); // TODO: Remove this line
-    path.push(DB_FILE);
-    path
 }
