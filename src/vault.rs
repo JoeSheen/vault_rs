@@ -22,7 +22,7 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS entries (
-            id INTEGER PRIMARY KEY, 
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
             site TEXT NOT NULL, 
             username TEXT NOT NULL, 
             password TEXT NOT NULL, 
@@ -83,14 +83,15 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, Str
 
     let result = conn
         .query_row(
-            "SELECT site, username, password, created_at FROM entries WHERE site = ?1",
+            "SELECT id, site, username, password, created_at FROM entries WHERE site = ?1",
             [site],
             |row| {
                 Ok(Entry {
-                    site: row.get(0)?,
-                    username: row.get(1)?,
-                    password: row.get(2)?,
-                    created_at: row.get(3)?,
+                    id: row.get(0)?,
+                    site: row.get(1)?,
+                    username: row.get(2)?,
+                    password: row.get(3)?,
+                    created_at: row.get(4)?,
                 })
             },
         )
@@ -115,16 +116,17 @@ pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
     let conn: Connection = db::open_db_connection(path)?;
 
     let mut stmt: Statement<'_> = conn
-        .prepare("SELECT site, username, password, created_at FROM entries")
+        .prepare("SELECT id, site, username, password, created_at FROM entries")
         .map_err(|e| e.to_string())?;
 
     let entries = stmt
         .query_map([], |row| {
             Ok(Entry {
-                site: row.get(0)?,
-                username: row.get(1)?,
-                password: row.get(2)?,
-                created_at: row.get(3)?,
+                id: row.get(0)?,
+                site: row.get(1)?,
+                username: row.get(2)?,
+                password: row.get(3)?,
+                created_at: row.get(4)?,
             })
         })
         .map_err(|e| e.to_string())?;
