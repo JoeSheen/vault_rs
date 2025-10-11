@@ -67,20 +67,24 @@ pub fn execute_command() -> Result<(), String> {
         }
         Commands::Get { site } => {
             let master: String = rpassword::prompt_password(PROMPT).unwrap();
-            if let Some(entry) = vault::get_entry(&master, &site)? {
-                let mut table: Table = Table::new();
-                table
-                    .set_header(vec!["ID", "Site", "Username", "Password", "Created At"])
-                    .add_row(vec![
-                        Cell::new(&entry.id),
-                        Cell::new(&entry.site),
-                        Cell::new(&entry.username),
-                        Cell::new(&entry.password),
-                        Cell::new(entry.created_at.format("%d-%m-%Y %H:%M:%S").to_string()),
-                    ]);
-                println!("{}", table);
-            } else {
-                println!("No entry found for site: {}", site);
+            match vault::get_entry(&master, &site) {
+                Ok(entry) => {
+                    let mut table: Table = Table::new();
+                    table
+                        .set_header(vec!["ID", "Site", "Username", "Password", "Created At"])
+                        .add_row(vec![
+                            Cell::new(entry.id),
+                            Cell::new(entry.site),
+                            Cell::new(entry.username),
+                            Cell::new(entry.password),
+                            Cell::new(entry.created_at.format("%d-%m-%Y %H:%M:%S").to_string()),
+                        ]);
+                    println!("{}", table);
+                }
+                Err(e) => {
+                    println!("No entry found for site: {}", site);
+                    println!("error: {}", e);
+                }
             }
         }
         Commands::List => {

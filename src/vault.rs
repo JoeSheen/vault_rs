@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
-use rusqlite::{Connection, OptionalExtension, Statement, params};
+use rusqlite::params;
 
-use crate::{db, models::Entry};
+use crate::{
+    db::{self, DbConnection},
+    models::Entry,
+};
 
 pub fn init_vault(master_password: &str) -> Result<(), String> {
     let path: PathBuf = db::build_db_path();
@@ -10,17 +13,18 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
         return Err("Vault already exists".to_string());
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
-    conn.execute(
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
+
+    db_conn.execute_action(
         "CREATE TABLE IF NOT EXISTS vault_metadata (
             id INTEGER PRIMARY KEY,
             master_password_hash TEXT NOT NULL
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create vault_metadata table: {}", e))?;
+        params![],
+        "err_msg",
+    )?;
 
-    conn.execute(
+    db_conn.execute_action(
         "CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             site TEXT NOT NULL, 
@@ -28,17 +32,17 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
             password TEXT NOT NULL, 
             created_at DATETIME NOT NULL
         )",
-        [],
-    )
-    .map_err(|e| format!("Failed to create entries table: {}", e))?;
+        params![],
+        "Failed to create entries table: ",
+    )?;
 
     // TODO: hash master_password
 
-    conn.execute(
+    db_conn.execute_action(
         "INSERT INTO vault_metadata (id, master_password_hash) VALUES (1, ?1)",
         params![master_password],
-    )
-    .map_err(|e| format!("Failed to insert master password: {}", e))?;
+        "Failed to insert master password: ",
+    )?;
 
     Ok(())
 }
@@ -55,19 +59,20 @@ pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
         ));
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
 
     // TODO: Encrypt passwords in the DB
-    conn.execute(
+
+    db_conn.execute_action(
         "INSERT INTO entries (site, username, password, created_at) VALUES (?1, ?2, ?3, ?4)",
         params![entry.site, entry.username, entry.password, entry.created_at],
-    )
-    .map_err(|e| format!("Failed to insert entry: {}", e))?;
+        "Failed to insert entry: ",
+    )?;
 
     Ok(())
 }
 
-pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, String> {
+pub fn get_entry(master_password: &str, site: &str) -> Result<Entry, String> {
     // TODO: verify master password at start if fn
     println!("{}", master_password);
 
@@ -79,26 +84,17 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Option<Entry>, Str
         ));
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
 
-    let result = conn
-        .query_row(
-            "SELECT id, site, username, password, created_at FROM entries WHERE site = ?1",
-            [site],
-            |row| {
-                Ok(Entry {
-                    id: row.get(0)?,
-                    site: row.get(1)?,
-                    username: row.get(2)?,
-                    password: row.get(3)?,
-                    created_at: row.get(4)?,
-                })
-            },
-        )
-        .optional()
-        .map_err(|e| e.to_string())?;
+    let mut entry: Entry = db_conn.fetch_single_row(
+        "SELECT id, site, username, password, created_at FROM entries WHERE site = ?1",
+        params![site],
+    )?;
 
-    Ok(result)
+    // TODO: decrypt password before returning
+    entry.password = entry.password;
+
+    Ok(entry)
 }
 
 pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
@@ -113,30 +109,12 @@ pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
         ));
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
+    let entries: Vec<Entry> = db_conn.prepare_and_execute_action(
+        "SELECT id, site, username, password, created_at FROM entries",
+    )?;
 
-    let mut stmt: Statement<'_> = conn
-        .prepare("SELECT id, site, username, password, created_at FROM entries")
-        .map_err(|e| e.to_string())?;
-
-    let entries = stmt
-        .query_map([], |row| {
-            Ok(Entry {
-                id: row.get(0)?,
-                site: row.get(1)?,
-                username: row.get(2)?,
-                password: row.get(3)?,
-                created_at: row.get(4)?,
-            })
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut results: Vec<Entry> = Vec::new();
-    for entry in entries {
-        results.push(entry.map_err(|e| e.to_string())?);
-    }
-
-    Ok(results)
+    Ok(entries)
 }
 
 pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
@@ -151,9 +129,13 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
         ));
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
-    conn.execute("DELETE FROM entries WHERE site = ?1", [site])
-        .map_err(|e| format!("Failed to delete entry: {}", e))?;
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
+
+    db_conn.execute_action(
+        "DELETE FROM entries WHERE site = ?1",
+        params![site],
+        "Failed to delete entry: ",
+    )?;
 
     Ok(())
 }
@@ -170,18 +152,21 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
         ));
     }
 
-    let conn: Connection = db::open_db_connection(path)?;
+    let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
 
-    conn.execute("DELETE FROM entries", [])
-        .map_err(|e| format!("Failed to delete entries: {}", e))?;
+    db_conn.execute_action(
+        "DELETE FROM entries",
+        params![],
+        "Failed to delete entries: ",
+    )?;
 
     // TODO: hash the new master passowrd
 
-    conn.execute(
+    db_conn.execute_action(
         "UPDATE vault_metadata SET master_password_hash = ?1 WHERE id = 1",
-        [new_password],
-    )
-    .map_err(|e| format!(": {}", e))?;
+        params![new_password],
+        "Failed to updated master password: ",
+    )?;
 
     Ok(())
 }
