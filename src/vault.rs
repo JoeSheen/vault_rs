@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use rusqlite::params;
 
 use crate::{
+    crypto,
     db::{self, DbConnection},
     models::Entry,
 };
@@ -36,11 +37,11 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
         "Failed to create entries table: ",
     )?;
 
-    // TODO: hash master_password
+    let master_password_hash: String = crypto::hash_master_password(master_password)?;
 
     db_conn.execute_action(
         "INSERT INTO vault_metadata (id, master_password_hash) VALUES (1, ?1)",
-        params![master_password],
+        params![master_password_hash],
         "Failed to insert master password: ",
     )?;
 
