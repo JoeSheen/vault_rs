@@ -73,4 +73,17 @@ impl DbConnection {
             })
             .map_err(|err| format!("{}", err))
     }
+
+    pub fn get_stored_master_password_hash(&self) -> Result<String, String> {
+        let mut stmt: Statement<'_> = self
+            .conn
+            .prepare("SELECT master_password_hash FROM vault_metadata LIMIT 1")
+            .map_err(|e| format!("{}", e))?;
+
+        let stored_hash: String = stmt
+            .query_row([], |row: &Row<'_>| row.get(0))
+            .map_err(|e| format!("{}", e))?;
+
+        Ok(stored_hash)
+    }
 }

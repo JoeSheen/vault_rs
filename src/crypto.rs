@@ -1,4 +1,3 @@
-// https://docs.rs/argon2/latest/argon2/#usage-simple-with-default-params
 use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
@@ -20,4 +19,26 @@ pub fn hash_master_password(master_password: &str) -> Result<String, String> {
 
     password_bytes.zeroize();
     Ok(hash)
+}
+
+pub fn verify_master_password(
+    stored_hash: &mut String,
+    password_attempt: &str,
+) -> Result<(), String> {
+    let parsed_hash = PasswordHash::new(stored_hash)
+        .map_err(|e| format!("Failed to parse stored hash: {}", e))?;
+
+    let argon2: Argon2<'_> = Argon2::default();
+
+    let result = argon2
+        .verify_password(password_attempt.as_bytes(), &parsed_hash)
+        .map_err(|e| format!("Password verification failed: {}", e));
+
+    stored_hash.zeroize();
+
+    result
+}
+
+pub fn encrypt(master_password: &str, entry_password: &str) -> Result<String, String> {
+    Ok(entry_password.to_uppercase().to_string())
 }

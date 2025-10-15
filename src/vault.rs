@@ -49,9 +49,6 @@ pub fn init_vault(master_password: &str) -> Result<(), String> {
 }
 
 pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
-    // TODO: verify master password at the start of fn.
-    println!("{}", master_password);
-
     let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
@@ -62,11 +59,19 @@ pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
 
     let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
 
-    // TODO: Encrypt passwords in the DB
+    let mut stored_hash: String = db_conn.get_stored_master_password_hash()?;
+    crypto::verify_master_password(&mut stored_hash, master_password)?;
+
+    let encoded_password: String = crypto::encrypt(master_password, &entry.password)?;
 
     db_conn.execute_action(
         "INSERT INTO entries (site, username, password, created_at) VALUES (?1, ?2, ?3, ?4)",
-        params![entry.site, entry.username, entry.password, entry.created_at],
+        params![
+            entry.site,
+            entry.username,
+            encoded_password,
+            entry.created_at
+        ],
         "Failed to insert entry: ",
     )?;
 
