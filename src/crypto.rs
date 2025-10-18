@@ -1,7 +1,5 @@
 use aes_gcm::{
-    Aes256Gcm, Key, KeyInit,
-    aead::{Aead, generic_array::GenericArray},
-    aes::cipher::typenum,
+    aead::{generic_array::GenericArray, Aead}, aes::cipher::typenum, Aes256Gcm, Key, KeyInit, Nonce
 };
 use argon2::{
     Argon2,
@@ -76,6 +74,31 @@ pub fn encrypt(master_password: &str, entry_password: &str) -> Result<String, St
     Ok(encoded)
 }
 
+pub fn decrypt(master_password: &str, entry_password: &str) -> Result<String, String> {
+    let (entry_cipher, salt_bytes, nonce_bytes) = from_base64(entry_password)?;
+
+    let argon2: Argon2<'_> = Argon2::default();
+
+    let mut key_bytes: [u8; 32] = [0u8; SALT_LEN];
+    argon2.hash_password_into(master_password.as_bytes(), &salt_bytes, &mut key_bytes)
+    .map_err(|e| format!("{}", e))?;
+
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let decrypted = cipher
+    .decrypt(nonce, entry_cipher.as_ref())
+    .map_err(|e| format!("Decryption failed: {}", e))?;
+
+    key_bytes.zeroize();
+
+    let plaintext_password: String = String::from_utf8(decrypted)
+    .map_err(|e| format!("Invalid UTF-8 in decrypted data: {}", e))?;
+
+    Ok(plaintext_password)
+}
+
 fn generate_salt() -> [u8; SALT_LEN] {
     let mut salt: [u8; 32] = [0u8; SALT_LEN];
     rand::rng().fill_bytes(&mut salt);
@@ -94,4 +117,26 @@ fn to_base64(entry_cipher: Vec<u8>, salt: &[u8], nonce: &[u8]) -> String {
     encrypted_data.extend_from_slice(nonce);
     encrypted_data.extend_from_slice(&entry_cipher);
     general_purpose::STANDARD.encode(encrypted_data)
+}
+
+fn from_base64(encoded: &str) -> Result<(Vec<u8>, [u8; SALT_LEN], [u8; NONCE_LEN]), String> {
+    let decoded: Vec<u8> = general_purpose::STANDARD
+    .decode(encoded)
+    .map_err(|e| format!("Failed to decode base64 input: {}", e))?;
+
+    if decoded.len() < SALT_LEN + NONCE_LEN {
+        return Err(format!("Decoded data is too short"));
+    }
+
+    let salt_bytes: [u8; 32] = decoded[0..SALT_LEN]
+    .try_into()
+    .map_err(|e| format!("Failed to parse salt: {}", e))?;
+
+    let nonce_bytes: [u8; 12] = decoded[SALT_LEN..SALT_LEN+NONCE_LEN]
+    .try_into()
+    .map_err(|e| format!("Failed to parse nonce: {}", e))?;
+
+    let entry_cipher: Vec<u8> = decoded[SALT_LEN+NONCE_LEN..].to_vec();
+
+    Ok((entry_cipher, salt_bytes, nonce_bytes))
 }

@@ -97,8 +97,9 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Entry, String> {
         params![site],
     )?;
 
-    // TODO: decrypt password before returning
-    entry.password = entry.password;
+    println!("pre: {}", entry.password);
+    entry.password = crypto::decrypt(master_password, &entry.password)?;
+    println!("post: {}", entry.password);
 
     Ok(entry)
 }
