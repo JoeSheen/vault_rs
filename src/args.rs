@@ -1,3 +1,4 @@
+use chrono::Local;
 use clap::{Parser, Subcommand};
 use comfy_table::{Cell, Table};
 
@@ -77,7 +78,12 @@ pub fn execute_command() -> Result<(), String> {
                             Cell::new(entry.site),
                             Cell::new(entry.username),
                             Cell::new(entry.password),
-                            Cell::new(entry.created_at.format("%d-%m-%Y %H:%M:%S").to_string()),
+                            Cell::new(
+                                entry
+                                    .created_at
+                                    .with_timezone(&Local)
+                                    .format("%Y-%m-%d %H:%M:%S"),
+                            ),
                         ]);
                     println!("{}", table);
                 }
@@ -97,11 +103,16 @@ pub fn execute_command() -> Result<(), String> {
                 table.set_header(vec!["ID", "Site", "Username", "Password", "Created At"]);
                 for entry in entries {
                     table.add_row(vec![
-                        Cell::new(&entry.id),
-                        Cell::new(&entry.site),
-                        Cell::new(&entry.username),
-                        Cell::new(&entry.password),
-                        Cell::new(entry.created_at.format("%d-%m-%Y %H:%M:%S").to_string()),
+                        Cell::new(entry.id),
+                        Cell::new(entry.site),
+                        Cell::new(entry.username),
+                        Cell::new(entry.password),
+                        Cell::new(
+                            entry
+                                .created_at
+                                .with_timezone(&Local)
+                                .format("%Y-%m-%d %H:%M:%S"),
+                        ),
                     ]);
                 }
                 println!("{}", table);
