@@ -79,9 +79,6 @@ pub fn add_entry(master_password: &str, entry: Entry) -> Result<(), String> {
 }
 
 pub fn get_entry(master_password: &str, site: &str) -> Result<Entry, String> {
-    // TODO: verify master password at start if fn
-    println!("{}", master_password);
-
     let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
@@ -91,23 +88,20 @@ pub fn get_entry(master_password: &str, site: &str) -> Result<Entry, String> {
     }
 
     let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
+
+    let mut stored_hash: String = db_conn.get_stored_master_password_hash()?;
+    crypto::verify_master_password(&mut stored_hash, master_password)?;
 
     let mut entry: Entry = db_conn.fetch_single_row(
         "SELECT id, site, username, password, created_at FROM entries WHERE site = ?1",
         params![site],
     )?;
-
-    println!("pre: {}", entry.password);
     entry.password = crypto::decrypt(master_password, &entry.password)?;
-    println!("post: {}", entry.password);
 
     Ok(entry)
 }
 
 pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
-    // TODO: verify master password at start if fn
-    println!("{}", master_password);
-
     let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
@@ -117,17 +111,23 @@ pub fn list_entries(master_password: &str) -> Result<Vec<Entry>, String> {
     }
 
     let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
-    let entries: Vec<Entry> = db_conn.prepare_and_execute_action(
+
+    let mut stored_hash: String = db_conn.get_stored_master_password_hash()?;
+    crypto::verify_master_password(&mut stored_hash, master_password)?;
+
+    let mut entries: Vec<Entry> = db_conn.prepare_and_execute_action(
         "SELECT id, site, username, password, created_at FROM entries",
     )?;
+    // TODO: decided if I want to show password in list.
+    //       maybe change to SELECT id, site, username, created_at FROM entries
+    for entry in entries.iter_mut() {
+        entry.password = crypto::decrypt(master_password, &entry.password)?;
+    }
 
     Ok(entries)
 }
 
 pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
-    // TODO: same as above
-    println!("{}", master_password);
-
     let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
@@ -137,6 +137,9 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
     }
 
     let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
+
+    let mut stored_hash: String = db_conn.get_stored_master_password_hash()?;
+    crypto::verify_master_password(&mut stored_hash, master_password)?;
 
     db_conn.execute_action(
         "DELETE FROM entries WHERE site = ?1",
@@ -148,9 +151,6 @@ pub fn delete_entry(master_password: &str, site: &str) -> Result<(), String> {
 }
 
 pub fn change_master_password(old_password: &str, new_password: &str) -> Result<(), String> {
-    // TODO: same as above
-    println!("{}", old_password);
-
     let path: PathBuf = db::build_db_path();
     if !path.exists() {
         return Err(format!(
@@ -161,17 +161,20 @@ pub fn change_master_password(old_password: &str, new_password: &str) -> Result<
 
     let db_conn: DbConnection = DbConnection::connect_to_database(path)?;
 
+    let mut stored_hash: String = db_conn.get_stored_master_password_hash()?;
+    crypto::verify_master_password(&mut stored_hash, old_password)?;
+
     db_conn.execute_action(
         "DELETE FROM entries",
         params![],
         "Failed to delete entries: ",
     )?;
 
-    // TODO: hash the new master passowrd
+    let new_master_password_hash: String = crypto::hash_master_password(new_password)?;
 
     db_conn.execute_action(
         "UPDATE vault_metadata SET master_password_hash = ?1 WHERE id = 1",
-        params![new_password],
+        params![new_master_password_hash],
         "Failed to updated master password: ",
     )?;
 
