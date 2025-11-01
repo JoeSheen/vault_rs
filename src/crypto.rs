@@ -72,30 +72,24 @@ pub fn encrypt(master_password: &str, entry_password: &str) -> Result<String, St
     ))
 }
 
+// TODO: update to use VaultError when required error types are in enum!
 pub fn decrypt(master_password: &str, entry_password: &str) -> Result<String, String> {
     let (entry_cipher, salt_bytes, nonce_bytes) = decode_encrypted_payload(entry_password)?;
 
-    let argon2: Argon2<'_> = Argon2::default();
-
-    let mut key_bytes: [u8; 32] = [0u8; SALT_LEN];
-    argon2
+    let mut key_bytes = [0u8; SALT_LEN];
+    Argon2::default()
         .hash_password_into(master_password.as_bytes(), &salt_bytes, &mut key_bytes)
-        .map_err(|e| format!("{}", e))?;
+        .map_err(|e| e.to_string())?;
 
-    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-
-    let decrypted = cipher
-        .decrypt(nonce, entry_cipher.as_ref())
-        .map_err(|e| format!("Decryption failed: {}", e))?;
-
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
     key_bytes.zeroize();
 
-    let plaintext_password: String = String::from_utf8(decrypted)
-        .map_err(|e| format!("Invalid UTF-8 in decrypted data: {}", e))?;
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let decrypted = cipher
+        .decrypt(nonce, entry_cipher.as_ref())
+        .map_err(|e| e.to_string())?;
 
-    Ok(plaintext_password)
+    Ok(String::from_utf8(decrypted).map_err(|e| e.to_string())?)
 }
 
 fn generate_salt() -> [u8; SALT_LEN] {

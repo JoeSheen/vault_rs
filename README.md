@@ -37,3 +37,7 @@ cargo build --release
 # Run it
 ./target/release/vault_rs
 ```
+
+## Resources
+
+1. [The Rust Programming Language](https://doc.rust-lang.org/stable/book/)
